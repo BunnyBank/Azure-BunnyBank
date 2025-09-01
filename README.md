@@ -80,4 +80,4 @@ Backend runs at: `http://localhost:3000`
 ---
 
 ## 📜 License
-MIT License © 2025 BunnyBank Demo
+MIT License © 2025 BunnyBank
