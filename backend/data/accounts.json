@@ -1,0 +1,4 @@
+{
+  "admin": { "password": "admin123", "balance": { "CAD": 1000, "USD": 726.66 }, "cryptos": {} },
+  "user1": { "password": "user123", "balance": { "CAD": 500, "USD": 363.33 }, "cryptos": {} }
+}

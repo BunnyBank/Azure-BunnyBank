@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>BunnyBank — Demo</title>
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <img src="favicon.png" alt="Logo" class="logo">
+  <header>
+    <h1>Bunny Bank</h1>
+    <p class="muted">Play demo — not real money</p>
+  </header>
+
+  <div class="wrap">
+    <!-- LOGIN -->
+    <div class="card" id="loginCard">
+      <h2>Login</h2>
+      <input id="username" placeholder="Username" autocomplete="username">
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+      <button onclick="login()">Login</button>
+      <p class="muted small">Demo accounts: <strong>admin/admin123</strong>, <strong>user1/user123</strong></p>
+    </div>
+
+    <!-- USER DASHBOARD -->
+    <div id="userView" style="display:none">
+      <div class="card">
+        <div class="flex-between">
+          <div>
+            <h2 id="welcomeUser">Welcome</h2>
+            <div id="balances" class="muted">Balances will show here</div>
+          </div>
+          <div class="muted small">Default currency: CAD</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Your Cryptos</h3>
+        <div id="cryptoBalances" class="muted small">No cryptos yet</div>
+
+        <div class="mt12">
+          <h4>Create New Crypto (cost: 100 CAD)</h4>
+          <input id="newCryptoName" placeholder="New crypto name (e.g. RabbitCoin)">
+          <button onclick="createCrypto()">Create Crypto (100 CAD)</button>
+        </div>
+
+        <div class="mt14">
+          <h4>Trade Crypto</h4>
+          <select id="tradeCryptoName"></select>
+          <input id="tradeAmount" type="number" placeholder="Amount">
+          <div class="grid">
+            <button onclick="buyCrypto()">Buy</button>
+            <button class="secondary" onclick="sellCrypto()">Sell</button>
+          </div>
+          <p class="muted small" id="tradePriceNote">Price: (set by admin)</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Send Money</h3>
+        <select id="payToUser"></select>
+        <input id="payAmount" type="number" placeholder="Amount">
+        <select id="payCurrency"><option value="CAD">CAD</option><option value="USD">USD</option></select>
+        <button onclick="sendPayment()">Send</button>
+      </div>
+    </div>
+
+    <!-- ADMIN DASHBOARD -->
+    <div id="adminView" style="display:none">
+      <div class="card">
+        <h3>Admin — Create Account</h3>
+        <div class="grid">
+          <input id="newUser" placeholder="Username">
+          <input id="newPass" placeholder="Password">
+        </div>
+        <button onclick="createAccount()">Create Account</button>
+      </div>
+
+      <div class="card">
+        <h3>Adjust Exchange Rate</h3>
+        <div class="grid">
+          <input id="rateSym" placeholder="Currency (e.g. USD)">
+          <input id="rateVal" type="number" placeholder="Rate (1 CAD = X)">
+        </div>
+        <button onclick="setRate()">Update Rate</button>
+      </div>
+
+      <div class="card">
+        <h3>Adjust User Balance (Reset)</h3>
+        <div class="grid">
+          <input id="adjUserBalance" placeholder="Username">
+          <input id="adjCurrencyBalance" placeholder="Currency (CAD)">
+        </div>
+        <input id="adjAmountBalance" type="number" placeholder="New Amount">
+        <button onclick="setBalance()">Update Balance</button>
+      </div>
+
+      <div class="card">
+        <h3>Crypto Prices (Admin)</h3>
+        <select id="cryptoPriceName"></select>
+        <input id="cryptoPriceValue" type="number" placeholder="Price in CAD">
+        <button onclick="setCryptoPrice()">Set Price</button>
+        <p class="muted small">Set per-token price used when users buy/sell.</p>
+      </div>
+
+      <div class="card">
+        <h3>All Users</h3>
+        <table>
+          <thead><tr id="userTableHead"></tr></thead>
+          <tbody id="userTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <button id="logoutBtn" onclick="logout()">Logout</button>
+
+<script>
+let currentUser = null;
+let accounts = {};
+let cryptoPrices = {};
+let exchangeRates = {};
+
+function hideAllDashboards() {
+  document.getElementById('userView').style.display = 'none';
+  document.getElementById('adminView').style.display = 'none';
+  document.getElementById('logoutBtn').style.display = 'none';
+}
+function showLogin() {
+  document.getElementById('loginCard').style.display = 'block';
+  hideAllDashboards();
+  document.getElementById('welcomeUser').innerText = '';
+}
+async function loadData() {
+  const res = await fetch('/api/data');
+  const data = await res.json();
+  accounts = data.accounts;
+  cryptoPrices = data.cryptoPrices;
+  exchangeRates = data.exchangeRates;
+  populateGlobalSelects();
+  renderBalances();
+  renderCrypto();
+  if (currentUser && currentUser.isAdmin) renderUserTable();
+}
+
+async function login() {
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value.trim();
+  if (!u || !p) { alert('Enter username and password'); return; }
+  const res = await fetch('/api/login', {
+    method: 'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username:u,password:p})
+  });
+  if (!res.ok) { alert('Login failed'); return; }
+  currentUser = await res.json();
+  document.getElementById('loginCard').style.display = 'none';
+  document.getElementById('userView').style.display = 'block';
+  if (currentUser.isAdmin) document.getElementById('adminView').style.display = 'block';
+  document.getElementById('logoutBtn').style.display = 'block';
+  document.getElementById('welcomeUser').innerText = currentUser.username;
+  loadData();
+}
+
+async function logout() {
+  currentUser = null;
+  showLogin();
+}
+
+// ---------- Render ----------
+function renderBalances() {
+  if (!currentUser) return;
+  const container = document.getElementById('balances');
+  let html = '';
+  for (const cur in currentUser.balance) {
+    html += `<strong>${cur}</strong>: ${Number(currentUser.balance[cur]).toFixed(2)} <br>`;
+  }
+  container.innerHTML = html;
+}
+
+function renderCrypto() {
+  if (!currentUser) return;
+  const container = document.getElementById('cryptoBalances');
+  const cryptos = currentUser.cryptos || {};
+  if (Object.keys(cryptos).length===0) {
+    container.innerHTML = '<span class="muted small">You do not own any crypto yet.</span>';
+    return;
+  }
+  let html = '';
+  for (const name in cryptos) {
+    const qty = cryptos[name];
+    const price = cryptoPrices[name] ?? 100;
+    html += `<div><strong>${name}</strong>: ${qty} — price ${price} CAD each</div>`;
+  }
+  container.innerHTML = html;
+}
+
+// ---------- Dropdowns ----------
+function populateGlobalSelects() {
+  const users = Object.keys(accounts);
+  const globalCryptos = new Set();
+  Object.values(accounts).forEach(u => { Object.keys(u.cryptos || {}).forEach(c => globalCryptos.add(c)); });
+
+  const paySelect = document.getElementById('payToUser');
+  paySelect.innerHTML = '';
+  users.forEach(u => { if (!currentUser || u!==currentUser.username) paySelect.innerHTML += `<option value="${u}">${u}</option>`; });
+
+  const tradeSelect = document.getElementById('tradeCryptoName');
+  tradeSelect.innerHTML = '';
+  if(globalCryptos.size===0){tradeSelect.innerHTML='<option value="">-- no cryptos available --</option>'}
+  else globalCryptos.forEach(c=>tradeSelect.innerHTML+=`<option value="${c}">${c}</option>`);
+
+  const priceSelect = document.getElementById('cryptoPriceName');
+  if(priceSelect){
+    priceSelect.innerHTML='';
+    if(globalCryptos.size===0) priceSelect.innerHTML='<option value="">-- no cryptos --</option>'
+    else globalCryptos.forEach(c=>priceSelect.innerHTML+=`<option value="${c}">${c}</option>`);
+  }
+
+  updateTradePriceNote();
+}
+
+// ---------- User Actions ----------
+async function createCrypto(){
+  const name = document.getElementById('newCryptoName').value.trim();
+  if(!name) { alert('Enter a name for the crypto'); return; }
+  const res = await fetch('/api/crypto', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username: currentUser.username, name})
+  });
+  const data = await res.json();
+  if(!data.success) return alert('Error creating crypto');
+  loadData();
+  alert(`Created crypto "${name}" at ${data.price} CAD`);
+}
+
+async function buyCrypto(){
+  const name=document.getElementById('tradeCryptoName').value;
+  const amt=parseFloat(document.getElementById('tradeAmount').value);
+  if(!name || !amt || amt<=0) { alert('Enter valid values'); return; }
+  const res=await fetch('/api/crypto/buy',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username:currentUser.username,name,amount:amt})
+  });
+  const data = await res.json();
+  if(!data.success) return alert('Error buying crypto');
+  loadData();
+  alert(`Bought ${amt} ${name}`);
+}
+
+async function sellCrypto(){
+  const name=document.getElementById('tradeCryptoName').value;
+  const amt=parseFloat(document.getElementById('tradeAmount').value);
+  if(!name || !amt || amt<=0) { alert('Enter valid values'); return; }
+  const res=await fetch('/api/crypto/sell',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username:currentUser.username,name,amount:amt})
+  });
+  const data = await res.json();
+  if(!data.success) return alert('Error selling crypto');
+  loadData();
+  alert(`Sold ${amt} ${name}`);
+}
+
+async function sendPayment(){
+  const recipient=document.getElementById('payToUser').value;
+  const amt=parseFloat(document.getElementById('payAmount').value);
+  const currency=document.getElementById('payCurrency').value;
+  if(!recipient || !amt || amt<=0) return alert('Enter valid values');
+  const res = await fetch('/api/pay',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({from:currentUser.username,to:recipient,amount:amt,currency})
+  });
+  const data=await res.json();
+  if(!data.success) return alert('Error sending payment');
+  loadData();
+  alert(`Sent ${amt} ${currency} to ${recipient}`);
+}
+
+// ---------- Admin ----------
+async function createAccount(){
+  const u=document.getElementById('newUser').value.trim();
+  const p=document.getElementById('newPass').value.trim();
+  if(!u || !p) return alert('Enter username/password');
+  const res=await fetch('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+  const data=await res.json();
+  if(!data.success) return alert('Error creating account');
+  loadData(); alert(`Created ${u}`);
+}
+
+async function setRate(){
+  const sym=document.getElementById('rateSym').value.trim();
+  const val=parseFloat(document.getElementById('rateVal').value);
+  if(!sym || isNaN(val)) return alert('Enter currency/rate');
+  await fetch(`/api/exchange/${sym}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({rate:val})});
+  loadData(); alert(`Set 1 CAD = ${val} ${sym}`);
+}
+
+async function setBalance(){
+  const u=document.getElementById('adjUserBalance').value.trim();
+  const cur=document.getElementById('adjCurrencyBalance').value.trim();
+  const amt=parseFloat(document.getElementById('adjAmountBalance').value);
+    if(!u || !cur || isNaN(amt)) { alert('Enter all fields'); return; }
+  const res = await fetch(`/api/users/${u}/balance`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ currency: cur, amount: amt })
+  });
+  const data = await res.json();
+  if(!data.success) return alert('Error updating balance');
+  loadData();
+  alert(`Updated ${u} ${cur} = ${amt}`);
+}
+
+async function setCryptoPrice(){
+  const name = document.getElementById('cryptoPriceName').value;
+  const price = parseFloat(document.getElementById('cryptoPriceValue').value);
+  if(!name || isNaN(price)) return alert('Enter crypto and price');
+  const res = await fetch(`/api/crypto/${name}/price`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ price })
+  });
+  const data = await res.json();
+  if(!data.success) return alert('Error setting price');
+  loadData();
+  alert(`Set ${name} price to ${price} CAD`);
+}
+
+// ---------- Admin Table ----------
+function renderUserTable(){
+  const head = document.getElementById('userTableHead');
+  const body = document.getElementById('userTableBody');
+  head.innerHTML = ''; body.innerHTML = '';
+
+  const currencySet = new Set();
+  Object.values(accounts).forEach(a => Object.keys(a.balance || {}).forEach(c => currencySet.add(c)));
+  const currencies = Array.from(currencySet);
+
+  head.innerHTML = '<th>User</th>' + currencies.map(c => `<th>${c}</th>`).join('') + '<th>Cryptos</th>';
+  for(const u of Object.keys(accounts)){
+    const rowVals = currencies.map(c => `<td>${(accounts[u].balance[c] ?? 0).toFixed(2)}</td>`).join('');
+    const cryptoSummary = Object.entries(accounts[u].cryptos || {}).map(([k,v])=>`${k}: ${v}`).join(', ')||'-';
+    body.innerHTML += `<tr><td>${u}</td>${rowVals}<td style="text-align:left;padding-left:10px">${cryptoSummary}</td></tr>`;
+  }
+}
+
+// ---------- Helpers ----------
+function updateTradePriceNote(){
+  const sel = document.getElementById('tradeCryptoName');
+  const note = document.getElementById('tradePriceNote');
+  const name = sel ? sel.value : null;
+  if(!name){ note.innerText = 'Price: (set by admin)'; return; }
+  const p = cryptoPrices[name] ?? 100;
+  note.innerText = `Price: ${p} CAD each`;
+}
+
+document.addEventListener('change', (e)=>{
+  if(e.target && e.target.id==='tradeCryptoName') updateTradePriceNote();
+});
+
+window.addEventListener('load', loadData);
+</script>
+</body>
+</html>
+
