@@ -1,43 +1,83 @@
-User Guide:
+# 🐇 BunnyBank
 
+BunnyBank is a demo banking web application with **frontend + backend** built for deployment on **Azure**.  
+It supports user accounts, crypto creation, exchange rates, and an admin panel for full management.
 
-BunnyBank Demo User Guide
-Demo Accounts
+---
 
-Admin: admin / admin123
+## 🚀 Features
 
-User: user1 / user123
+### 👤 User
+- View balances (CAD, USD, Crypto).
+- Create new cryptocurrencies (cost: 100 CAD).
+- Buy/Sell crypto at admin-set prices.
+- Send money to other users.
 
-Normal User Actions
+### 🛠️ Admin
+- Create new accounts (default CAD 100 balance).
+- Adjust exchange rates (e.g., CAD → USD).
+- Adjust user balances manually.
+- Set crypto prices for buy/sell.
+- View all users and their balances.
 
-View balances: CAD, USD, crypto holdings.
+---
 
-Create new crypto: Costs 100 CAD.
+## 📂 Project Structure
 
-Buy/Sell crypto: Price set by admin.
+```
+Azure-BunnyBank/
+├── backend/            # Node.js + Express backend (API + data handling)
+├── frontend/           # Static frontend (HTML, CSS, JS)
+│   ├── index.html
+│   ├── style.css
+│   ├── script.js
+│   └── images/
+│       └── favicon.png
+├── package.json        # Dependencies + scripts
+└── README.md           # Project documentation
+```
 
-Send money: Select user, currency, amount.
+---
 
-Admin Actions
+## ⚙️ Setup & Run
 
-Create accounts: Add new users, starting balance CAD 100.
+### 1. Clone Repository
+```bash
+git clone https://github.com/yourusername/Azure-BunnyBank.git
+cd Azure-BunnyBank
+```
 
-Adjust exchange rates: CAD → USD or any currency.
+### 2. Install Dependencies
+```bash
+npm install
+```
 
-Adjust balances: Reset or change a user’s currency amount.
+### 3. Run Locally
+```bash
+node server.js
+```
+Backend runs at: `http://localhost:3000`
 
-Set crypto prices: Define per-token price used in buy/sell.
+### 4. Deploy to Azure
+- Create a new **Azure Web App (Node.js runtime)**.
+- Deploy via GitHub Actions or `az webapp up`.
+- Ensure `package.json` is included for build.
 
-View all users: See balances and cryptos in a table.
+---
 
-UI Notes
+## 🔑 Demo Accounts
 
-Logout button always on bottom-right.
+- **Admin:** `admin` / `admin123`  
+- **User:** `user1` / `user123`  
 
-Top-left logo is fixed.
+---
 
-Everything updates dynamically from backend.
+## 📝 Notes
+- Logout button is always bottom-right.  
+- BunnyBank favicon located in `/frontend/images/favicon.png`.  
+- Exchange rates, balances, and crypto prices are **fully configurable in the Admin Panel**.  
 
-If you want, I can also make a tiny animated GIF demo showing logging in, creating crypto, and sending money. That would be hilarious for your site. 😎
+---
 
-Do you want me to do that?
+## 📜 License
+MIT License © 2025 BunnyBank Demo
